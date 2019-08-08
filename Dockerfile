@@ -1,12 +1,12 @@
-FROM python:2.7
+FROM alpine:3.10
 
-MAINTAINER Your Name "youremail@domain.tld"
+MAINTAINER Your Name "w.lulek@gmail.com"
+
+RUN apk add --no-cache python3-dev \
+	&& pip3 install --upgrade pip
 
 COPY . /app
 WORKDIR /app
-RUN pip install -r requirements.txt
-ENTRYPOINT ["python"]
+RUN pip3 install -r requirements.txt
+ENTRYPOINT ["python3"]
 CMD ["main.py"]
-
-
-
