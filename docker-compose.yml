@@ -1,10 +1,18 @@
 version: '3'
 
 services:
- flask:
-  build: .
-  ports:
-   - 8902:8902
-
  redis:
   image: redis:alpine
+ 
+ database:
+  build: postgresql/
+  ports:
+   - 5432:5432
+
+ web:
+  build: web/
+  ports:
+   - 8903:8903
+  depends_on:
+   - database
+   - redis
