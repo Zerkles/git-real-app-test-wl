@@ -5,8 +5,11 @@ import time
 import redis
 import psycopg2
 import json
+import logging
+import os
 
 cache = redis.Redis(host='redis', port=6379)
+logging.basicConfig(level=logging.DEBUG)
 
 
 @app.route("/")
@@ -34,19 +37,18 @@ def get_hit_count():
 
 @app.route("/room", methods=['POST'])
 def add():
-    # try:
-    data = json.loads(request.data)
-    name, available = "'" + str(data["name"]) + "'", data["available"]
-    cursor.execute(f"""INSERT INTO Rooms (name,available) VALUES ({name} ,{available})""")
-    connection.commit()
-    cursor.execute(f"""SELECT MAX(id) FROM Rooms WHERE name={name} AND available={available}""")
-    id = cursor.fetchall()[0][0]
-    return {"id": id, "name": name, "available": available}, 201
+    try:
+        data = json.loads(request.data)
+        name, available = "'" + str(data["name"]) + "'", data["available"]
+        cursor.execute(f"""INSERT INTO Rooms (name,available) VALUES ({name} ,{available})""")
+        connection.commit()
+        cursor.execute(f"""SELECT MAX(id) FROM Rooms WHERE name={name} AND available={available}""")
+        id = cursor.fetchall()[0][0]
+        return {"id": id, "name": name, "available": available}, 201
 
-
-# except (Exception) as error:
-# print(error)
-# return {"message": error}, 400
+    except Exception as error:
+        logging.error(error)
+        return {"message": error}, 400
 
 
 @app.route("/room/<room_id>", methods=['DELETE'])
@@ -57,8 +59,8 @@ def delete(room_id):
         cursor.execute(f"DELETE from Rooms where id={room_id}")
         connection.commit()
         return {"id": id, "name": name, "available": available}
-    except (Exception) as error:
-        print(error)
+    except Exception as error:
+        logging.error(error)
         return {"message": error}, 400
 
 
@@ -68,8 +70,8 @@ def get(room_id):
         cursor.execute(f"SELECT * from Rooms where id={room_id}")
         id, name, available = cursor.fetchall()[0]
         return {"id": id, "name": str(name), "available": str(available)}
-    except (Exception) as error:
-        print(error)
+    except Exception as error:
+        logging.error(error)
         return {"message": error}, 400
 
 
@@ -91,26 +93,26 @@ def get2():
             id, name, available = x
             response.append({"id": id, "name": str(name), "available": str(available)})
         return {"rooms": response}
-    except (Exception) as error:
-        print(error)
+    except Exception as error:
+        logging.error(error)
         return {"message": error}, 400
 
 
 def connect_database():
     try:
-        connection = psycopg2.connect(user="admin",
-                                      password="admin1234",
-                                      host="database",
-                                      port="5432",
-                                      database="post_db")
-        print('Connected with database!')
+        connection = psycopg2.connect(user=str(os.environ.get('DB_USER')),
+                                      password=str(os.environ.get('DB_PASSWORD')),
+                                      host=str(os.environ.get('DB_HOST')),
+                                      port=str(os.environ.get('DB_PORT')),
+                                      database=str(os.environ.get('DB_NAME')))
+        logging.info('Connected with database!')
         return connection
-    except (Exception) as error:
-        print(error)
+    except Exception as error:
+        logging.error(error)
         return {"message": error}, 400
 
 
 if __name__ == "__main__":
     connection = connect_database()
     cursor = connection.cursor()
-    app.run(host='0.0.0.0', debug=True, port=8903)
+    app.run(host=os.environ.get('HOST'), debug=os.environ.get('DEBUG'), port=os.environ.get('WEB_PORT'))

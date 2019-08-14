@@ -8,3 +8,6 @@ build-flask:
 	docker build -t flask-app:latest web/.
 run-flask:
 	docker run -it -p 8903:8903 flask-app:latest
+do-flask:
+	docker build -t flask-app:latest web/.
+	docker run -it -p 8903:8903 flask-app:latest
