@@ -1,4 +1,4 @@
-CREATE TABLE Rooms (id BIGSERIAL PRIMARY KEY,name VARCHAR (32) NOT NULL,available BOOLEAN);
+CREATE TABLE Rooms (id BIGSERIAL PRIMARY KEY,name VARCHAR (128) NOT NULL,available BOOLEAN);
 
 INSERT INTO Rooms (id,name,available)
 VALUES (123,'adam',true);

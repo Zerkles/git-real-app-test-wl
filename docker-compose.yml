@@ -13,6 +13,8 @@ services:
   build: web/
   ports:
    - 8903:8903
+  environment:
+   - DB_HOST=database
   depends_on:
    - database
    - redis

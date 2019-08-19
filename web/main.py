@@ -1,14 +1,14 @@
 from flask import Flask, request
-
-app = Flask(__name__)
-import time
-import redis
-import psycopg2
 import json
 import logging
 import os
+import psycopg2
+import redis
+import time
 
-cache = redis.Redis(host='redis', port=6379)
+app = Flask(__name__)
+
+cache = redis.Redis(host="redis", port=6379)
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -20,14 +20,14 @@ def hello():
 @app.route("/count")
 def visit():
     count = get_hit_count()
-    return 'Hello World! I have been seen {} times.\n'.format(count)
+    return "Hello World! I have been seen {} times.\n".format(count)
 
 
 def get_hit_count():
     retries = 5
     while True:
         try:
-            return cache.incr('hits')
+            return cache.incr("hits")
         except redis.exceptions.ConnectionError as exc:
             if retries == 0:
                 raise exc
@@ -35,23 +35,28 @@ def get_hit_count():
             time.sleep(0.5)
 
 
-@app.route("/room", methods=['POST'])
-def add():
+@app.route("/room", methods=["POST"])
+def post():
     try:
         data = json.loads(request.data)
-        name, available = "'" + str(data["name"]) + "'", data["available"]
-        cursor.execute(f"""INSERT INTO Rooms (name,available) VALUES ({name} ,{available})""")
+        name, available = """ + str(data["name"]) + """, data["available"]
+        query = f"""INSERT INTO Rooms (name,available) VALUES ({name} ,{available})"""
+        cursor.execute(query)
+        logging.info("POST_QUERY: "+query)
         connection.commit()
-        cursor.execute(f"""SELECT MAX(id) FROM Rooms WHERE name={name} AND available={available}""")
+        cursor.execute(
+            f"""SELECT MAX(id) FROM Rooms WHERE name={name} AND available={available}"""
+        )
         id = cursor.fetchall()[0][0]
         return {"id": id, "name": name, "available": available}, 201
 
     except Exception as error:
+        logging.info(query)
         logging.error(error)
         return {"message": error}, 400
 
 
-@app.route("/room/<room_id>", methods=['DELETE'])
+@app.route("/room/<room_id>", methods=["DELETE"])
 def delete(room_id):
     try:
         cursor.execute(f"SELECT * from Rooms where id={room_id}")
@@ -64,7 +69,7 @@ def delete(room_id):
         return {"message": error}, 400
 
 
-@app.route("/room/<room_id>", methods=['GET'])
+@app.route("/room/<room_id>", methods=["GET"])
 def get(room_id):
     try:
         cursor.execute(f"SELECT * from Rooms where id={room_id}")
@@ -75,13 +80,13 @@ def get(room_id):
         return {"message": error}, 400
 
 
-@app.route("/rooms", methods=['GET'])
+@app.route("/rooms", methods=["GET"])
 def get2():
     try:
-        is_available = request.args.get('available')
-        if (is_available != None and is_available == "1"):
+        is_available = request.args.get("available")
+        if is_available is not None and is_available == "1":
             cursor.execute("SELECT * from Rooms where available=True")
-        elif (is_available != None and is_available == "0"):
+        elif is_available is not None and is_available == "0":
             cursor.execute("SELECT * from Rooms where available=False")
         else:
             cursor.execute("SELECT * from Rooms")
@@ -100,12 +105,14 @@ def get2():
 
 def connect_database():
     try:
-        connection = psycopg2.connect(user=str(os.environ.get('DB_USER')),
-                                      password=str(os.environ.get('DB_PASSWORD')),
-                                      host=str(os.environ.get('DB_HOST')),
-                                      port=str(os.environ.get('DB_PORT')),
-                                      database=str(os.environ.get('DB_NAME')))
-        logging.info('Connected with database!')
+        connection = psycopg2.connect(
+            user=str(os.environ.get("DB_USER")),
+            password=str(os.environ.get("DB_PASSWORD")),
+            host=str(os.environ.get("DB_HOST")),
+            port=str(os.environ.get("DB_PORT")),
+            database=str(os.environ.get("DB_NAME")),
+        )
+        logging.info("Connected with database!")
         return connection
     except Exception as error:
         logging.error(error)
@@ -113,6 +120,14 @@ def connect_database():
 
 
 if __name__ == "__main__":
-    connection = connect_database()
-    cursor = connection.cursor()
-    app.run(host=os.environ.get('HOST'), debug=os.environ.get('DEBUG'), port=os.environ.get('WEB_PORT'))
+    try:
+        connection = connect_database()
+        cursor = connection.cursor()
+    except Exception as error:
+        logging.error(error)
+    truth_check = ["True", "true", "1"]
+    app.run(
+        host=os.environ.get("HOST"),
+        debug=bool(os.environ.get("DEBUG") in truth_check),
+        port=os.environ.get("WEB_PORT"),
+    )

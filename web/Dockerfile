@@ -1,23 +1,28 @@
 FROM alpine:3.10
-
 MAINTAINER Your Name "w.lulek@gmail.com"
 
-RUN apk update && apk add postgresql-dev gcc musl-dev
-RUN apk add --no-cache python3-dev \
-	&& pip3 install --upgrade pip
-
+#Variables for setting up Flask
 ENV HOST 0.0.0.0
 ENV WEB_PORT 8903
-ENV DEBUG True
+ENV DEBUG False
 
+#Variables used to connect with Postgresql database
 ENV DB_USER admin
 ENV DB_PASSWORD admin1234
-ENV DB_HOST database
+ENV DB_HOST 0.0.0.0
 ENV DB_PORT 5432
 ENV DB_NAME post_db
 
-COPY . /app
+RUN apk update && apk add postgresql-dev gcc musl-dev
+RUN apk add --no-cache python3-dev && apk add make
+
 WORKDIR /app
+COPY . /app
+
+RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
-ENTRYPOINT ["python3"]
-CMD ["main.py"]
+RUN pip3 install -r requirements-dev.txt
+
+#RUN make code-quality-check
+
+CMD python3 main.py
