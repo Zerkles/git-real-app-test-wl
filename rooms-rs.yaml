@@ -1,0 +1,38 @@
+apiVersion: extensions/v1beta1
+kind: ReplicaSet
+metadata:
+  name: rooms-rs
+  labels:
+    app: rooms-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rooms-rs
+  template:
+    metadata:
+      labels:
+        app: rooms-rs
+    spec:
+      containers:
+      - name: flask
+        image: zerkles/flask-rooms-wl:latest
+        ports:
+        - containerPort: 8080
+
+      - name: postgres
+        image: postgres:9.6
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "admin"
+        - name: POSTGRES_PASSWORD
+          value: "admin1234"
+        - name: POSTGRES_DB
+          value: "post_db"
+
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379

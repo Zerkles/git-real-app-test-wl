@@ -1,10 +1,11 @@
 from flask import Flask, request
 import json
 import logging
-import os
+import re
 import psycopg2
 import redis
 import time
+import os
 
 app = Flask(__name__)
 
@@ -38,69 +39,93 @@ def get_hit_count():
 @app.route("/room", methods=["POST"])
 def post():
     try:
+        connection.reset()
         data = json.loads(request.data)
-        name, available = """ + str(data["name"]) + """, data["available"]
-        query = f"""INSERT INTO Rooms (name,available) VALUES ({name} ,{available})"""
+        name, available = "'" + data["name"] + "'", "'" + data["available"] + "'"
+        check_for_special_characters(data["name"])
+        query = f"""INSERT INTO Rooms (name,available) VALUES ({name}, {bool(available)})"""
+        logging.info("POST_QUERY: " + query)
         cursor.execute(query)
-        logging.info("POST_QUERY: "+query)
         connection.commit()
         cursor.execute(
-            f"""SELECT MAX(id) FROM Rooms WHERE name={name} AND available={available}"""
+            f"""SELECT MAX(id) AS id,name,available FROM Rooms 
+            WHERE name={name} AND available={available} GROUP BY name, available"""
         )
-        id = cursor.fetchall()[0][0]
-        return {"id": id, "name": name, "available": available}, 201
-
+        id2, name2, available2 = cursor.fetchall()[0]
+        return {"id": id2, "name": name2, "available": str(available2)}, 201
     except Exception as error:
-        logging.info(query)
+        if 'query' in locals():
+            logging.info("POST_QUERY: " + query)
         logging.error(error)
-        return {"message": error}, 400
+        return {"message": str(error)}, 400
 
 
 @app.route("/room/<room_id>", methods=["DELETE"])
 def delete(room_id):
     try:
-        cursor.execute(f"SELECT * from Rooms where id={room_id}")
+        connection.reset()
+        cursor.execute(f"SELECT * from Rooms where id={int(room_id)}")
         id, name, available = cursor.fetchall()[0]
-        cursor.execute(f"DELETE from Rooms where id={room_id}")
+        query = f"DELETE from Rooms where id={int(room_id)}"
+        cursor.execute(query)
         connection.commit()
         return {"id": id, "name": name, "available": available}
     except Exception as error:
+        if 'query' in locals():
+            logging.info("DELETE_QUERY: " + query)
         logging.error(error)
-        return {"message": error}, 400
+        return {"message": str(error)}, 400
 
 
 @app.route("/room/<room_id>", methods=["GET"])
 def get(room_id):
     try:
-        cursor.execute(f"SELECT * from Rooms where id={room_id}")
+        connection.reset()
+        query = f"SELECT * from Rooms where id={int(room_id)}"
+        cursor.execute(query)
         id, name, available = cursor.fetchall()[0]
         return {"id": id, "name": str(name), "available": str(available)}
     except Exception as error:
+        if 'query' in locals():
+            logging.info("GET_QUERY: " + query)
         logging.error(error)
-        return {"message": error}, 400
+        return {"message": str(error)}, 400
 
 
 @app.route("/rooms", methods=["GET"])
 def get2():
     try:
+        connection.reset()
         is_available = request.args.get("available")
-        if is_available is not None and is_available == "1":
-            cursor.execute("SELECT * from Rooms where available=True")
-        elif is_available is not None and is_available == "0":
-            cursor.execute("SELECT * from Rooms where available=False")
+        if is_available is not None:
+            if string_to_bool(is_available):
+                cursor.execute("SELECT * from Rooms where available=True")
+            else:
+                cursor.execute("SELECT * from Rooms where available=False")
         else:
             cursor.execute("SELECT * from Rooms")
 
-        result = cursor.fetchall()
         response = []
 
-        for x in result:
+        for x in cursor.fetchall():
             id, name, available = x
-            response.append({"id": id, "name": str(name), "available": str(available)})
+            response.append({"id": id, "name": name, "available": str(available)})
         return {"rooms": response}
     except Exception as error:
         logging.error(error)
-        return {"message": error}, 400
+        return {"message": str(error)}, 400
+
+
+def check_for_special_characters(string):
+    regex = re.compile('[,@_!#$%^&*()<>?/;.|}{~:]')
+    if regex.search(string) is not None:
+        raise ValueError(f"Variable contains special characters!: {string}")
+
+
+def string_to_bool(string):
+    if string in ["True", "true", "1"]:
+        return True
+    return False
 
 
 def connect_database():
@@ -116,7 +141,7 @@ def connect_database():
         return connection
     except Exception as error:
         logging.error(error)
-        return {"message": error}, 400
+        return {"message": str(error)}, 400
 
 
 if __name__ == "__main__":
@@ -125,9 +150,8 @@ if __name__ == "__main__":
         cursor = connection.cursor()
     except Exception as error:
         logging.error(error)
-    truth_check = ["True", "true", "1"]
     app.run(
         host=os.environ.get("HOST"),
-        debug=bool(os.environ.get("DEBUG") in truth_check),
+        debug=string_to_bool(os.environ.get("DEBUG")),
         port=os.environ.get("WEB_PORT"),
     )
